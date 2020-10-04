@@ -429,7 +429,28 @@ def findLowUpIndex(arr, lowBound = NEG_INFINITY, upBound = INFINITIY, startIndex
     print("rightIndex: " + str(rightIndex))
     return leftIndex, rightIndex
 
-def divide3Region(df, columns = ["MSD_xy_mean"],threshold2_low = 0.3,threshold2_high = 0.6 ):
+def getLogLogSlope(df, yColumn = ["MSD_xy_mean"], xColumn = ["time"]):
+    """
+    find the slope k which is given by log(y) = k * log(x) + b
+    """
+    ## eliminate possible zero rows
+
+    if (len(yColumn) > 1 or len(xColumn) > 1):
+        raise Exception("Only support for one dimensional array!")
+    if (len(yColumn) < 1 or len(xColumn) < 1):
+        raise Exception("no entry in yColumn or xColumn!")
+    df_prune = eliminateZeroTime(df)
+    
+    for xCol in xColumn:
+        for yCol in yColumn:
+            tLog = np.log(df_prune[xCol])
+            msdLog = np.log(df_prune[yCol])
+            tLogDiff = diffArr(tLog)
+            msdLogDiff = diffArr(msdLog)
+            slopes = msdLogDiff / tLogDiff
+            return slopes
+
+def divide3Region(df, columns = ["MSD_xy_mean"],threshold2_low = 0.3,threshold2_high = 0.6, threshold1_low = 1.6, threshold3_low = 0.8):
     """
 
     very specific for MSD analysis, given the msd, divide the series into three regions
@@ -449,8 +470,8 @@ def divide3Region(df, columns = ["MSD_xy_mean"],threshold2_low = 0.3,threshold2_
     make several columns possible
 
     """
-    threshold1down = 1.6
-    threshold3_low = 0.8
+    # threshold1_low = 1.6
+    # threshold3_low = 0.8
     if (threshold3_low < threshold2_high + EPSILON):
         threshold3_low += 0.09
     threshold3_high = 1.2
@@ -460,13 +481,14 @@ def divide3Region(df, columns = ["MSD_xy_mean"],threshold2_low = 0.3,threshold2_
     
     for col in columns:
         # timeSeries = df_prune["time",col]
-        tLog = np.log(df_prune["time"])
-        msdLog = np.log(df_prune[col])
-        tLogDiff = diffArr(tLog)
-        msdLogDiff = diffArr(msdLog)
-        slopes = msdLogDiff / tLogDiff
+        # tLog = np.log(df_prune["time"])
+        # msdLog = np.log(df_prune[col])
+        # tLogDiff = diffArr(tLog)
+        # msdLogDiff = diffArr(msdLog)
+        # slopes = msdLogDiff / tLogDiff
+        slopes = getLogLogSlope(df_prune, yColumn = [col], xColumn= ["time"])
         ## find the first region
-        l1Dummy, r1 = findLowUpIndex(slopes, lowBound= threshold1down)
+        l1Dummy, r1 = findLowUpIndex(slopes, lowBound= threshold1_low)
         l2,r2 = findLowUpIndex(slopes, lowBound=threshold2_low, upBound= threshold2_high)
         # have to make sure that l3 starts to count after the region 2
         l3,r3Dummy = findLowUpIndex(slopes, lowBound= threshold3_low, upBound = threshold3_high, startIndex=r2)
@@ -510,13 +532,16 @@ def msdRegression(df, columns = ["MSD_xy_mean"]):
     Making multiple columns possible
 
     """
-    tLog = np.log(df["time"])
+
+    # pandas.Series do not support reshape function, and given a pandas.Series, the np.log() wont convert that to a ndarray
+    # so need to convert to a ndarray first
+    tLog = np.log(df["time"]).to_numpy().reshape((-1,1))
 
     for col in columns:
         msdLog = np.log(df[col])
         return simpleLinearRegression(tLog, msdLog)
 
-def msdFittingPlot(df, columns = ["MSD_xy_mean"]):
+def msdFittingPlot(df, columns = ["MSD_xy_mean"], threshold2_low = 0.3,threshold2_high = 0.6, threshold1_low = 1.6, threshold3_low = 0.8):
     """
     plot the msd and the curve fitting
 
@@ -525,11 +550,12 @@ def msdFittingPlot(df, columns = ["MSD_xy_mean"]):
     ----
     df should eliminate 0?
     making multiple columns possible
+    annotate the curve
     """
     df = eliminateZeroTime(df)
 
     for col in columns:
-        list1, list2, list3, slopes = divide3Region(df,columns = [col])
+        list1, list2, list3, slopes = divide3Region(df,columns = [col], threshold2_low = threshold2_low, threshold2_high = threshold2_high, threshold1_low = threshold1_low, threshold3_low = threshold3_low)
         indexLists = [list1,list2,list3]
         dfLists = [df.iloc[indexLists[var]] for var in range(3)]
         fig, axes = plt.subplots()
@@ -538,15 +564,25 @@ def msdFittingPlot(df, columns = ["MSD_xy_mean"]):
         tLog = np.log(df["time"])
         msdLog = np.log(df[col])
         plt.plot(tLog,msdLog, label = legends[0])
-        
-        # for i in range(3):
-        #     k,b = msdRegression(dfLists[i], columns = [col])
-        #     ts = np.log(dfLists[i])
-        #     ys = k * ts + b
-        #     plt.plot(ts, ys, label = legends[i + 1])
-        
-        plt.show()
 
+        for i in range(3):
+            k,b = msdRegression(dfLists[i], columns = [col])
+            if (i == 0):
+                intercept_1 = np.exp(b)
+            elif ( i == 1):
+                alpha_2 = k[0]
+            else:
+                intercept_3 = np.exp(b)
+            # ts = np.log(dfLists[i]["time"])
+            ts = np.log(df["time"])
+            ys = k * ts + b
+            plt.plot(ts, ys, label = legends[i + 1], linestyle = "dashed")
+        plt.legend()
+        plt.show()
+    print("ballistic region, const (2d * kT/m): {:.4f}".format(intercept_1))
+    print("subdiffusion region, potent alpha: {:.4f}".format(alpha_2))
+    print("brownian region, const (2dD): {:.4f}".format(intercept_3))
+    return intercept_1, alpha_2, intercept_3
 
 if __name__ == "__main__":
     arr = np.array([2,3,4,5,6,8])
