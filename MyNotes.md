@@ -94,6 +94,16 @@ ValueError: cannot switch from automatic field numbering to manual field specifi
 ```
 
 use instead `print("hello: {0:.2f}, yes:{1:.4f}".format(a,b))`
+
+* [floating point epsilon](https://stackoverflow.com/questions/9528421/value-for-epsilon-in-python)
+
+```python
+import sys
+sys.float_info.epsilon
+```
+
+also [interesting posts](https://stackoverflow.com/questions/34611858/machine-epsilon-in-python?lq=1) ,introduce `np.spacing` returns the next floating point
+
 ## os
 
 
@@ -195,6 +205,24 @@ use
 df = df.drop(["some column"], axis = 1, error = "ignore")
 ```
 
+* [update row with condition](https://stackoverflow.com/questions/36909977/update-row-values-where-certain-condition-is-met-in-pandas/36910033)
+something like: 
+
+```python
+df.loc[df["colA"] == "someThing", ["colB","colC"]] = 1 
+```
+
+* [scatter plot for different groups](https://stackoverflow.com/questions/21654635/scatter-plots-in-pandas-pyplot-how-to-plot-by-category)
+
+```python
+groups = df.groupby("molecule")
+
+for name, group in groups:
+    plt.plot(group.chol_percentage, group.diffusion_coefficient, marker = 'o', linestyle = '', ms = 12, label = name)
+plt.legend()
+plt.show()
+```
+
 ## numpy
 
 * [numpy.select](https://numpy.org/doc/stable/reference/generated/numpy.select.html)
@@ -227,6 +255,8 @@ fig.tight_layout(pad = 5.0)
 * [equivalent of hold on](https://stackoverflow.com/questions/21465988/python-equivalent-to-hold-on-in-matlab)
 the command `plt.hold(True)` is deprecated, now simply add plot use command `plt.plot(...)` and at the end `plt.show()` will plot all lines
 into one figure
+
+
 
 ## re
 
@@ -288,3 +318,19 @@ print('slope:', model.coef_)  # the slope
 * [rename columns](https://stackoverflow.com/questions/11346283/renaming-columns-in-pandas) or [here](https://stackoverflow.com/questions/29442370/how-to-correctly-read-csv-in-pandas-while-changing-the-names-of-the-columns)
 
 I think sth like `pd.read_csv(fileName, header = 0, columns = myColumnName)`
+
+* [add new columns and rows](https://www.geeksforgeeks.org/adding-new-column-to-existing-dataframe-in-pandas/)
+
+```python
+df["newcolumn"] = listLikeStructure # add column
+df.insert(listLikeStructure)  # add new row
+```
+
+#### numpy
+
+* [interesting posts](https://stackoverflow.com/questions/34611858/machine-epsilon-in-python?lq=1) ,introduce `np.spacing` returns the next floating point
+
+### theory
+
+* [python mittag-leffler instability](https://stackoverflow.com/questions/48645381/instability-in-mittag-leffler-function-using-numpy), 
+I think it's caused by the divergence of the series representation of the functioin for |z| > 1

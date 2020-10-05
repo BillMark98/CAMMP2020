@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 from scipy.stats import shapiro
 from scipy.stats import chisquare
 from sklearn.linear_model import LinearRegression
+from sklearn.metrics import mean_squared_error
 import fileIO
 
 DEFAULT_NUM = 10000
@@ -714,7 +715,7 @@ def getLogLogSlope(df, yColumn = ["MSD_xy_mean"], xColumn = ["time"], method = "
             slopes = msdLogDiff / tLogDiff
             return slopes
 
-def divide3Region(df, columns = ["MSD_xy_mean"],threshold2_low = 0.3,threshold2_high = 0.6, threshold1_low = 1.6, threshold3_low = 0.8):
+def divide3Region(df, columns = ["MSD_xy_mean"],threshold2_low = 0.3,threshold2_high = 0.6, threshold1_low = 1.6, threshold3_low = 0.8, region3start = -1):
     """
 
     very specific for MSD analysis, given the msd, divide the series into three regions
@@ -731,8 +732,9 @@ def divide3Region(df, columns = ["MSD_xy_mean"],threshold2_low = 0.3,threshold2_
     To do
     ------
 
-    make several columns possible, make the search adaptive, do not require user to guess which threshold to set, maybe could try to use second order difference
-
+    1.  make several columns possible, make the search adaptive, do not require user to guess which threshold to set, maybe could try to use second order difference
+    2.  region3Start, need  to check not too large?
+    
     """
     # threshold1_low = 1.6
     # threshold3_low = 0.8
@@ -755,7 +757,11 @@ def divide3Region(df, columns = ["MSD_xy_mean"],threshold2_low = 0.3,threshold2_
         l1Dummy, r1 = findLowUpIndex(slopes, lowBound= threshold1_low)
         l2,r2 = findLowUpIndex(slopes, lowBound=threshold2_low, upBound= threshold2_high)
         # have to make sure that l3 starts to count after the region 2
-        l3,r3Dummy = findLowUpIndex(slopes, lowBound= threshold3_low, upBound = threshold3_high, startIndex=r2)
+
+        region3start = max(region3start, r2)
+        if (region3start >= len(df[col])):
+            raise Exception("region3start too large, already exceeds the series length!")
+        l3,r3Dummy = findLowUpIndex(slopes, lowBound= threshold3_low, upBound = threshold3_high, startIndex=region3start)
         list1 = list(range(0,r1 + 1))
         list2 = list(range(l2,r2 + 1))
         list3 = list(range(l3,len(slopes)))
@@ -769,9 +775,11 @@ def simpleLinearRegression(xArr,yArr):
     Parameters:
     ----
 
-    return: k,b
+    return: k,b,mean_squared_error, confidenceInterval of k, confidenceInterval of b
     """
     model = LinearRegression().fit(xArr,yArr)
+    # yPred = LinearRegression().
+    # mean_sqre_error = mean_sqre_error()
     return model.coef_, model.intercept_
 
 def msdRegression(df, columns = ["MSD_xy_mean"]):
@@ -787,7 +795,7 @@ def msdRegression(df, columns = ["MSD_xy_mean"]):
     Parmaeters:
     -----
 
-    return: k, b
+    return: k, b, mean_squared_error, confidenceInterval of k, confidenceInterval of b
 
     ----
     To do:
@@ -805,21 +813,35 @@ def msdRegression(df, columns = ["MSD_xy_mean"]):
         msdLog = np.log(df[col])
         return simpleLinearRegression(tLog, msdLog)
 
-def msdFittingPlot(df, columns = ["MSD_xy_mean"], threshold2_low = 0.3,threshold2_high = 0.6, threshold1_low = 1.6, threshold3_low = 0.8):
+def msdFittingPlot(df, columns = ["MSD_xy_mean"], threshold2_low = 0.6,threshold2_high = 0.8, threshold1_low = 1.6, threshold3_low = 0.8, region3start = -1, time_unit = "ps", msd_unit = "nm", outputUnit = "si"):
     """
     plot the msd and the curve fitting
+
+    -----
+    Parameters
+    -----
+
+    time_unit: str, 
+    indicate the units of the timescale, default ps
 
     ----
     To do:
     ----
-    df should eliminate 0?
-    making multiple columns possible
-    annotate the curve
+    1. df should eliminate 0?
+    2. making multiple columns possible
+    3. annotate the curve with slope and intercept
+    4. given units, figure out the constant to change to SI seconds
     """
     df = eliminateZeroTime(df)
 
+    if (time_unit == "ps" and msd_unit == "nm"):
+        # factor = 1e-12
+        offset_alpha = 12 * np.log(10) # each intercept calculated need to add this offset * alpha, e.g MSD * 1e-18 = k (1e-12 * t)^a, logMSD = logk + a * log(t) - 12 a * log(10) + 18 log(10)
+        offset_const = -18 * np.log(10) 
+    else:
+        raise Exception("currently does not support other units")
     for col in columns:
-        list1, list2, list3, slopes = divide3Region(df,columns = [col], threshold2_low = threshold2_low, threshold2_high = threshold2_high, threshold1_low = threshold1_low, threshold3_low = threshold3_low)
+        list1, list2, list3, slopes = divide3Region(df,columns = [col], threshold2_low = threshold2_low, threshold2_high = threshold2_high, threshold1_low = threshold1_low, threshold3_low = threshold3_low, region3start = region3start)
         indexLists = [list1,list2,list3]
         dfLists = [df.iloc[indexLists[var]] for var in range(3)]
         fig, axes = plt.subplots()
@@ -827,29 +849,43 @@ def msdFittingPlot(df, columns = ["MSD_xy_mean"], threshold2_low = 0.3,threshold
         legends = ["MSD","ballistic","subdiffusion","brownian"]
         tLog = np.log(df["time"])
         msdLog = np.log(df[col])
-        plt.plot(tLog,msdLog, label = legends[0])
+        plt.plot(np.exp(tLog),np.exp(msdLog), label = legends[0])
+        # plt.plot(tLog,msdLog, label = legends[0])
 
         for i in range(3):
             k,b = msdRegression(dfLists[i], columns = [col])
+            b_siunit = b + offset_alpha * k[0] + offset_const
             if (i == 0):
-                intercept_1 = np.exp(b)
+                intercept_1 = np.exp(b_siunit)
+                if (outputUnit == "si"):
+                    b_1 = intercept_1
+                else:
+                    b_1 = np.exp(b)
                 k_1 = k[0]
             elif ( i == 1):
-                intercept_2 = np.exp(b)
+                intercept_2 = np.exp(b_siunit)
                 alpha_2 = k[0]
             else:
-                intercept_3 = np.exp(b)
+                intercept_3 = np.exp(b_siunit)
                 k_3 = k[0]
+                if (outputUnit == "si"):
+                    b_3 = intercept_3
+                else:
+                    b_3 = np.exp(b)                
             # ts = np.log(dfLists[i]["time"])
             ts = np.log(df["time"])
             ys = k * ts + b
-            plt.plot(ts, ys, label = legends[i + 1], linestyle = "dashed")
+
+            plt.loglog(np.exp(ts), np.exp(ys), label = legends[i + 1], linestyle = "dashed")
+            # plt.plot(ts, ys, label = legends[i + 1], linestyle = "dashed")
         plt.legend()
         plt.show()
-    print("ballistic region, const (2d * kT/m): {0:.4f}, potent: {1:.4f}".format(intercept_1, k_1))
-    print("subdiffusion region, intercept: {0:.4f}, potent alpha: {1:.4f}".format(intercept_2, alpha_2))
-    print("brownian region, const (2dD): {0:.4f}, potent: {1:.4f}".format(intercept_3, k_3))
-    return intercept_1, alpha_2, intercept_3
+    constant1 = df.iloc[0][col] * 1e6 / np.square(df.iloc[0]["time"])
+    print("ballistic region, one point calculated const (d * kT/m):{0:.4e}".format(constant1))
+    print("ballistic region, const (d * kT/m): {0:.4e}, potent: {1:.4f}".format(intercept_1, k_1))
+    print("subdiffusion region, intercept: {0:.4e}, potent alpha: {1:.4f}".format(intercept_2, alpha_2))
+    print("brownian region, const (2dD): {0:.4e}, potent: {1:.4f}".format(intercept_3, k_3))
+    return b_1, alpha_2, b_3
 
 if __name__ == "__main__":
     arr = np.array([2,3,4,5,6,8])
