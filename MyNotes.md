@@ -55,6 +55,45 @@ Note that the parenthesis are essential, else will cause the problem [`truth val
 
 * [indexing array based on a list](https://stackoverflow.com/questions/3179106/python-select-subset-from-list-based-on-index-set)
 
+* [remove sublists from a list](https://stackoverflow.com/questions/2514961/remove-all-values-within-one-list-from-another-list/30353802)
+
+```python
+    [x for x in arr if x not in sublist]
+```
+
+* [delete element from a list suppress ValueError if element not exists](https://stackoverflow.com/questions/4915920/how-to-delete-an-item-in-a-list-if-it-exists) or [here](https://stackoverflow.com/questions/9915339/how-can-i-ignore-valueerror-when-i-try-to-remove-an-element-from-a-list)
+either hard code, or convert to a set and use `myset.discare(elem)` or 
+
+```python
+try:
+    arr.remove(elem)
+except ValueError:
+    pass
+```
+
+* [dictionary comprehension](https://www.datacamp.com/community/tutorials/python-dictionary-comprehension?utm_source=adwords_ppc&utm_campaignid=898687156&utm_adgroupid=48947256715&utm_device=c&utm_keyword=&utm_matchtype=b&utm_network=g&utm_adpostion=&utm_creative=229765585186&utm_targetid=aud-299261629574:dsa-473406574715&utm_loc_interest_ms=&utm_loc_physical_ms=9044818&gclid=Cj0KCQjw5eX7BRDQARIsAMhYLP9ayrB3oG8wubLGGadQEb6JsaZZiSH3isVBMsMDEd3rYM81e4pyLvYaArrSEALw_wcB)
+
+```python
+    temp = {key: f(key) for key in origList}
+```
+
+* formatting string for several varibles, need to specify the number
+
+```python
+a = 2
+b = 3
+print("hello: {:.2f}, yes:{1:.4f}".format(a,b))  # wrong!
+```
+
+will generate error:
+
+```python
+Traceback (most recent call last):
+  File "<stdin>", line 1, in <module>
+ValueError: cannot switch from automatic field numbering to manual field specification
+```
+
+use instead `print("hello: {0:.2f}, yes:{1:.4f}".format(a,b))`
 ## os
 
 
@@ -134,6 +173,27 @@ or similarly
 * [how pandas use matplotlib](http://jonathansoma.com/lede/algorithms-2017/classes/fuzziness-matplotlib/how-pandas-uses-matplotlib-plus-figures-axes-and-subplots/)
 
 * [as_index in groupby](https://stackoverflow.com/questions/41236370/what-is-as-index-in-groupby-in-pandas)
+
+* [concatenate two dataframes](https://pandas.pydata.org/pandas-docs/stable/user_guide/merging.html),
+  
+```python
+    pd.concat([df1,df2],axis = 1) # axis = 1, means concatenate horizontally
+```
+
+* [rename columns of a dataframe](https://www.datacamp.com/community/tutorials/python-rename-column?utm_source=adwords_ppc&utm_campaignid=898687156&utm_adgroupid=48947256715&utm_device=c&utm_keyword=&utm_matchtype=b&utm_network=g&utm_adpostion=&utm_creative=332602034352&utm_targetid=aud-748597547652:dsa-429603003980&utm_loc_interest_ms=&utm_loc_physical_ms=9044818&gclid=Cj0KCQjw5eX7BRDQARIsAMhYLP-_t7a5ryrHzsKN9XX5XP6XcjUyzhLY42C2yvbhl8EhiAClktFsv74aAqjhEALw_wcB) or [here](https://cmdlinetips.com/2018/03/how-to-change-column-names-and-row-indexes-in-pandas/)
+
+use 
+
+```python
+    df.rename(columns = {'oldname1': 'newname1'}, inplace = True) # True will do the change in the original df, False otherwise
+```
+
+* [drop column and ignore error if column not existant](https://stackoverflow.com/questions/59116716/df-drop-if-it-exists)
+use 
+
+```python
+df = df.drop(["some column"], axis = 1, error = "ignore")
+```
 
 ## numpy
 

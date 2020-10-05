@@ -8,7 +8,7 @@ import fileIO
 
 DEFAULT_NUM = 10000
 EPSILON = 1e-20
-INFINITIY = 1000000
+INFINITY = 1000000
 NEG_INFINITY = -1000000
 def almostEqual(a,b,epsilon = EPSILON):
     return np.abs(a-b) < epsilon
@@ -18,6 +18,202 @@ def makeDivisible(a, d = 2):
         return d - a % d + a
     else:
         return a
+
+def findCommonInterval(list1, list2, as_series = True):
+    """
+    find the common interval of list  1 and list 2
+
+    ----
+    Parameters:
+    ----
+
+    as_series: bool
+    boolean indicating whether list1 and list2 are arithmetic sequence, if so, more efficient method can be used
+
+    return: low1,up1, low2,up2, s.t list1[low1:up1] ~ list2[low2:up2]
+
+    ------
+    To do:
+    ------
+    create version for non-as series, and check also whether the given series are arithmetic
+    check also that the two lists can have an intersection, also the calculation for high_small and low_large is very sloppy
+    """ 
+    # find which one is larger
+    if (list1[1] < list2[1]):
+        larger = list2
+        smaller = list1
+        inOrder = True
+    else:
+        larger = list1
+        smaller = list2
+        inOrder = False
+    # epsilon = INFINITY
+    # for count in range(len(list1)):
+    #     difference = abs(list(1) - )
+    
+
+    ## alternative
+    ## assuming arithmetic_sequence
+    if (as_series):
+        dstep_small = smaller[1] - smaller[0]
+        dstep_large = larger[1] - larger[0]
+        low_small = int(dstep_large / dstep_small) - 1
+        high_small = len(smaller)  ### sloppy
+        low_large = 1
+        high_large = int(smaller[-1] / dstep_large) + 1
+        if (inOrder):
+            return low_small, high_small, low_large, high_large
+        else:
+            return low_large, high_large, low_small, high_small
+    else:
+
+        raise Exception("Non arithmetic increase not supported yet!")
+
+def findCommonPoints(list1, list2, as_series = True):
+    """
+    find the common points (in the sense of almostEqual) of two lists
+
+    -----
+    Parameters:
+    -----
+
+    return: index1List, index2List, 
+
+    ------
+    To do:
+    ---------
+    The case for non as_series
+    """
+    # find which one is larger
+    if (list1[1] < list2[1]):
+        larger = list2
+        smaller = list1
+        inOrder = True
+    else:
+        larger = list1
+        smaller = list2
+        inOrder = False
+    # epsilon = INFINITY
+    # for count in range(len(list1)):
+    #     difference = abs(list(1) - )
+    
+
+    ## alternative
+    ## assuming arithmetic_sequence
+    if (as_series):
+        dstep_small = smaller[1] - smaller[0]
+        dstep_large = larger[1] - larger[0]
+        factor = int(dstep_large / dstep_small)
+
+        low_large = 0
+        low_small = int((larger[low_large] - smaller[0]) / dstep_small)
+        high_small = len(smaller)  ### sloppy
+
+        smallIndex = list(range(low_small, high_small, factor))
+        
+        high_large = int((smaller[-1] - larger[low_large]) / dstep_large) + 1
+        largeIndex = list(range(low_large, high_large))
+        if (inOrder):
+            return smallIndex, largeIndex
+        else:
+            return largeIndex, smallIndex
+    else:
+
+        raise Exception("Non arithmetic increase not supported yet!")    
+
+def calculateMeanVarMedian(df, columns = ["MSD_x", "MSD_y", "MSD_z", "MSD_xy"], dropXY = True):
+    """
+    calculate the useful statistics, mean, variance, median, rename the column accordingly,
+    dropXY indicate whether to drop the column MSD_x and MSD_y
+
+    --------
+    Parameters:
+    --------
+
+    df: dataframe
+
+    columns: list like
+    specify what statistics will be calculated for
+
+    dropXY: bool
+
+    return: dataframe containing the statistics
+
+    -----
+    Assume
+    ------
+    df has column called "time" and "trajectory"
+    """
+    
+    # drop "MSD_x" and "MSD_y" if needed
+    if (dropXY):
+        if ("MSD_x" in columns):
+            columns.remove("MSD_x")
+        if ("MSD_y" in columns):
+            columns.remove("MSD_y")
+        df.drop(["MSD_x","MSD_y"], axis = 1, errors = "ignore", inplace = True)
+
+    df_mean = df.groupby(["time"], as_index = False).mean().drop(["trajectory"], axis = 1)
+    mean_dict = {key : key + "_mean" for key in columns}
+    df_mean.rename(columns = mean_dict, inplace = True)
+
+    df_median = df.groupby(["time"], as_index = False).median().drop(["time","trajectory"], axis = 1)
+    median_dict = {key : key + "_median" for key in columns}
+    df_median.rename(columns = median_dict, inplace = True)
+
+    df_var = df.groupby(["time"], as_index = False).var().drop(["time", "trajectory"], axis = 1)
+    var_dict = {key : key + "_var" for key in columns}
+    df_var.rename(columns = var_dict, inplace = True)
+
+    return pd.concat([df_mean,df_median, df_var], axis = 1)
+
+def merge2TimeScale(df1, df2, columns = ["MSD_xy_mean","MSD_z"]):
+    """
+    given two dataframe saving the msd for two different time scales, merge the two together
+
+    ------
+    To do:
+    ------
+    Check first that df1 and df2 are of the same composition and molecule!
+
+    ------
+    Parameters:
+    ----------
+
+    df1: dataframe,
+
+    df2: dataframe
+
+    columns: list like, saving the columns to be merged
+
+    return : dataframe with columns as specified in the variable columns
+
+    ------
+    Assuming
+    -------
+    dataframe has columns called "time"
+
+    """
+
+    ## To do, check if it is reasonable to merge these two
+
+    ## find common interval
+    l1, l2 = findCommonPoints(df1["time"], df2["time"], as_series = True)
+    df1 = df1.iloc[l1]
+    df2 = df2.iloc[l2]
+    if (len(df1) != len(df2)):
+        print(l1)
+        print(l2)
+        raise Exception("findCommonPoints error, returned list1 and 2 not equal length!")
+    for col in columns:
+        minDiff = INFINITY
+        minIndex = -1
+        for i in range(len(df1)):
+            difference = abs(df1.iloc[i][col] - df2.iloc[i][col])
+            if (difference < minDiff):
+                minDiff = difference
+                minIndex = i
+        
 def chooseIndex(indices, num, lowPercentile = 0, upPercentile = 1):
     """
     choose indices from [lowPercentile * len, upPercentile * len]:
@@ -342,11 +538,22 @@ def histPlot(df, timePoints, timeNum , particleNum, bins = 50, normalityTestCol 
 
     plt.show()
 
-def diffArr(arr):
+def diffArr(arr, method = "forward"):
     """
 
     calculates the difference between each elements of arr
 
+    -------
+    Parameters:
+    ------
+
+    method: str
+    method used for diffArr, "forward", "central", "backward"
+
+    -------
+    To do:
+    -------
+    for central diff, how to treat the first element, here use upward diff
     """
 # not sure if some arr starts indexing with 0
 # for example, doing a slicing of a dataframe, will cause arr starts at index 1
@@ -355,15 +562,65 @@ def diffArr(arr):
     lenArr = len(arr)
     arTemp = [None] * (lenArr - 1)
     count = 0
-    for val in arr:
-        if (count == 0):
-            oldval = val
-        else:
-            arTemp[count - 1] = val - oldval
-            oldval = val
-        count += 1
+    if (method == "forward"):
+        for val in arr:
+            if (count == 0):
+                oldval = val
+            else:
+                arTemp[count - 1] = val - oldval
+                oldval = val
+            count += 1
+    elif (method == "central"):
+        for val in arr:
+            if (count == 0):
+                oldval = val
+            elif (count == 1):
+                arTemp[0] = val - oldval # the diff for the first element use forward
+            elif(count >= 2):
+                arTemp[count - 1] = val - oldval
+                oldval = arr[count - 1]
+            count += 1
+    elif (method == "backward"):
+        raise Exception("temporarily not supported for backward")
+    else:
+        raise Exception("unknown type of method for calculation diff: " + method)
+
     return np.array(arTemp)
 
+def getSlope(xArr, yArr, method = "forward"):
+    """
+    get the slope of yArr w.r.t xArr,
+
+    ------
+    Parameters:
+    ------
+
+    method: str
+    method use for calculating slope, "forward", "central", "backward"
+
+    ---
+    To do:
+    ----
+    1.  realize the "backward" scheme
+    2.  does central makes sense, if x is not arithmetic sequence?
+    3.  could relax np.array(diffArr(...)) because diffArrr already ensures the returned is ndarray
+    """
+    if (len(xArr) != len(yArr)) :
+        raise Exception("x and y not equal length, cant calculate the slope")
+    if (method == "forward"):
+        xArr_diff = np.array(diffArr(xArr, method = "forward"))
+        yArr_diff = np.array(diffArr(yArr, method = "forward"))
+    elif (method == "central"):
+        xArr_diff = np.array(diffArr(xArr, method = "central"))
+        yArr_diff = np.array(diffArr(yArr, method = "central"))
+    elif (method == "backward"):
+        xArr_diff = np.array(diffArr(xArr, method = "backward"))
+        yArr_diff = np.array(diffArr(yArr, method = "backward"))
+    else:
+        raise Exception("Unknown type of method for slope calculation: " + method)
+
+    slopes = yArr_diff/xArr_diff
+    return slopes    
 def eliminateZeroTime(df):
     """
     eliminate the 0 time row, (doing log will cause problem)
@@ -379,7 +636,7 @@ def eliminateZeroTime(df):
     else:
         return df
 
-def findLowUpIndex(arr, lowBound = NEG_INFINITY, upBound = INFINITIY, startIndex = -1):
+def findLowUpIndex(arr, lowBound = NEG_INFINITY, upBound = INFINITY, startIndex = -1):
     """
     find the left, right index of an array, that has a continuous range lying between [lowBound, upBound]
     only count the first time this range is hit, and with consideration to the startIndex
@@ -429,9 +686,16 @@ def findLowUpIndex(arr, lowBound = NEG_INFINITY, upBound = INFINITIY, startIndex
     print("rightIndex: " + str(rightIndex))
     return leftIndex, rightIndex
 
-def getLogLogSlope(df, yColumn = ["MSD_xy_mean"], xColumn = ["time"]):
+def getLogLogSlope(df, yColumn = ["MSD_xy_mean"], xColumn = ["time"], method = "forward"):
     """
     find the slope k which is given by log(y) = k * log(x) + b
+
+    ------
+    Parameters:
+    ------
+    
+    method: str
+    method used for the calculation of slopes, "forward", "central", "backward"
     """
     ## eliminate possible zero rows
 
@@ -467,7 +731,7 @@ def divide3Region(df, columns = ["MSD_xy_mean"],threshold2_low = 0.3,threshold2_
     To do
     ------
 
-    make several columns possible
+    make several columns possible, make the search adaptive, do not require user to guess which threshold to set, maybe could try to use second order difference
 
     """
     # threshold1_low = 1.6
@@ -569,19 +833,22 @@ def msdFittingPlot(df, columns = ["MSD_xy_mean"], threshold2_low = 0.3,threshold
             k,b = msdRegression(dfLists[i], columns = [col])
             if (i == 0):
                 intercept_1 = np.exp(b)
+                k_1 = k[0]
             elif ( i == 1):
+                intercept_2 = np.exp(b)
                 alpha_2 = k[0]
             else:
                 intercept_3 = np.exp(b)
+                k_3 = k[0]
             # ts = np.log(dfLists[i]["time"])
             ts = np.log(df["time"])
             ys = k * ts + b
             plt.plot(ts, ys, label = legends[i + 1], linestyle = "dashed")
         plt.legend()
         plt.show()
-    print("ballistic region, const (2d * kT/m): {:.4f}".format(intercept_1))
-    print("subdiffusion region, potent alpha: {:.4f}".format(alpha_2))
-    print("brownian region, const (2dD): {:.4f}".format(intercept_3))
+    print("ballistic region, const (2d * kT/m): {0:.4f}, potent: {1:.4f}".format(intercept_1, k_1))
+    print("subdiffusion region, intercept: {0:.4f}, potent alpha: {1:.4f}".format(intercept_2, alpha_2))
+    print("brownian region, const (2dD): {0:.4f}, potent: {1:.4f}".format(intercept_3, k_3))
     return intercept_1, alpha_2, intercept_3
 
 if __name__ == "__main__":
@@ -592,3 +859,12 @@ if __name__ == "__main__":
     charArr = ["hi","there","yo","yo1","haha"]
     tempIndx = chooseIndex(charArr,2, 0,0.5)
     print(tempIndx)
+
+    ar1 = np.arange(4,20,4)
+    ar2 = np.arange(1,20,1)
+
+    l1, l2 = findCommonPoints(ar1,ar2)
+    print(ar1)
+    print(ar2)
+    print(l1)
+    print(l2)
