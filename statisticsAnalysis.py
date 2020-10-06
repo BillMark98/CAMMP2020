@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 from scipy.stats import shapiro
 from scipy.stats import chisquare
 from scipy.stats import t
+from scipy.stats import norm
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error
 import fileIO
@@ -540,6 +541,14 @@ def histPlot(df, timePoints, timeNum , particleNum, bins = 50, normalityTestCol 
 
     plt.show()
 
+def testHist(df, timeNum = 8, particleAverageNum = 8, normalityTestCol = ["MSD_xy"]):
+    """
+
+    given a dataframe, genearte a historam visualisation of the dataframe
+
+    """
+
+
 def diffArr(arr, method = "forward"):
     """
 
@@ -638,7 +647,7 @@ def eliminateZeroTime(df):
     else:
         return df
 
-def findLowUpIndex(arr, lowBound = NEG_INFINITY, upBound = INFINITY, startIndex = -1):
+def findLowUpIndex(arr, lowBound = NEG_INFINITY, upBound = INFINITY, startIndex = -1, endIndex = -1, userIsKing = True):
     """
     find the left, right index of an array, that has a continuous range lying between [lowBound, upBound]
     only count the first time this range is hit, and with consideration to the startIndex
@@ -654,6 +663,11 @@ def findLowUpIndex(arr, lowBound = NEG_INFINITY, upBound = INFINITY, startIndex 
 
     startIndex: int
 
+    endIndex: int, -1 default meaning no constraint
+
+    userIsKing: boolean, default True :-)
+    when there is collision of the lowBound and the available min, if False, use the available min, else the considering the user given and choose an optimal
+
     ------
     To do:
     ------
@@ -668,6 +682,26 @@ def findLowUpIndex(arr, lowBound = NEG_INFINITY, upBound = INFINITY, startIndex 
     leftFound = False
     rightFound = False
     continuous = True
+
+    if (endIndex > 0):
+        endIndex = min(endIndex, len(arr))
+    else:
+        endIndex = len(arr)
+    
+    if (startIndex < 0):
+        startIndex = 0
+    arrSlice = arr[startIndex : endIndex]
+    arrSlice_low = min(arrSlice)
+    arrSlice_max = max(arrSlice)
+
+    if ( not userIsKing):
+        lowBound = arrSlice_low
+        upBound = arrSlice_max
+    else:
+        if (lowBound < arrSlice_max ):
+            lowBound = max(lowBound, arrSlice_low)
+        if (upBound > arrSlice_low):
+            upBound = min(upBound, arrSlice_max)
     for i in range(len(boolArr)):
         if (i >= startIndex):
             if ((boolArr[i] == True) and (leftFound == False)):
@@ -682,6 +716,11 @@ def findLowUpIndex(arr, lowBound = NEG_INFINITY, upBound = INFINITY, startIndex 
                     rightFound = True
                     continuous = False
                     break
+        if (i > endIndex):
+            if (leftFound == False):
+                raise Exception("could not find any index, leftIndex already beyond the array")
+            else:
+                break
     print("lowBound: " + str(lowBound))
     print("upBound: " + str(upBound))
     print("leftIndex: " + str(leftIndex))
@@ -711,12 +750,14 @@ def getLogLogSlope(df, yColumn = ["MSD_xy_mean"], xColumn = ["time"], method = "
         for yCol in yColumn:
             tLog = np.log(df_prune[xCol])
             msdLog = np.log(df_prune[yCol])
-            tLogDiff = diffArr(tLog)
-            msdLogDiff = diffArr(msdLog)
+            tLogDiff = diffArr(tLog, method = method)
+            msdLogDiff = diffArr(msdLog, method = method)
             slopes = msdLogDiff / tLogDiff
             return slopes
 
-def divide3Region(df, columns = ["MSD_xy_mean"],threshold2_low = 0.3,threshold2_high = 0.6, threshold1_low = 1.6, threshold3_low = 0.8, region3start = -1):
+def divide3Region(df, columns = ["MSD_xy_mean"],threshold2_low = 0.3,threshold2_high = 0.8, \
+    threshold1_low = 1.6, threshold3_low = 0.8, region2start = -1, region3start = -1, secondDerivThreshold = 0.6, \
+        indexJump = 20, method = "forward"):
     """
 
     very specific for MSD analysis, given the msd, divide the series into three regions
@@ -724,6 +765,9 @@ def divide3Region(df, columns = ["MSD_xy_mean"],threshold2_low = 0.3,threshold2_
     ------
     Parameters
     -------
+
+    secondDerivThreshold: float
+    set the threshold for the secondDerivative of the slopes
 
     return: three lists and the slopes
     example usage l1,l2,l3,slopes = divide3Region(df, columns = ["MSD_xy"])
@@ -753,10 +797,36 @@ def divide3Region(df, columns = ["MSD_xy_mean"],threshold2_low = 0.3,threshold2_
         # tLogDiff = diffArr(tLog)
         # msdLogDiff = diffArr(msdLog)
         # slopes = msdLogDiff / tLogDiff
-        slopes = getLogLogSlope(df_prune, yColumn = [col], xColumn= ["time"])
+        slopes = getLogLogSlope(df_prune, yColumn = [col], xColumn= ["time"], method = method)
+        slopesDiff = diffArr(slopes)
+        tLog = diffArr(df_prune["time"])[0:-1]
+        slopesDeriv = slopesDiff / tLog
+        print("slopesDeriv:")
+        print(slopesDeriv)
+        boolArr = np.abs(slopesDeriv) > secondDerivThreshold
+        print("number > threshold : " + str(np.sum(boolArr)))
+        print("indexArr:")
+        # indexArr n * 1
+        indexArr = np.where(boolArr)[0]
+        print(indexArr)
+        # find the region where the index jump occurs
+        indexArrDiff = diffArr(indexArr)
+        print("indexArrDiff:")
+        print(indexArrDiff)
+        boolDiffArr = np.abs(indexArrDiff) > indexJump
+        index_indexArr = np.where(boolDiffArr)[0]
+        print("index_indexArr:")
+        print(index_indexArr)
+        start2IndexCandidate = indexArr[index_indexArr[0]]
+        print("startPoint for region2")
+        print(start2IndexCandidate)
+        
+        start2Index = max(start2IndexCandidate, region2start)
+        end2Index = indexArr[index_indexArr[0] + 1]
+
         ## find the first region
         l1Dummy, r1 = findLowUpIndex(slopes, lowBound= threshold1_low)
-        l2,r2 = findLowUpIndex(slopes, lowBound=threshold2_low, upBound= threshold2_high)
+        l2,r2 = findLowUpIndex(slopes, lowBound=threshold2_low, upBound= threshold2_high, startIndex= start2Index, endIndex= end2Index)
         # have to make sure that l3 starts to count after the region 2
 
         region3start = max(region3start, r2)
@@ -780,7 +850,7 @@ def simpleLinearRegression(xArr,yArr, confidence = 0.95):
     """
     model = LinearRegression().fit(xArr,yArr)
     x = xArr.flatten()
-    yPred = model.predict(x)
+    yPred = model.predict(xArr)
     n = len(x)
     if (n > 2):
         mean_sqre_error = mean_squared_error(yPred,yArr) * n / (n - 2)
@@ -788,7 +858,7 @@ def simpleLinearRegression(xArr,yArr, confidence = 0.95):
         mean_sqre_error = mean_squared_error(yPred,yArr)
         print("less than 2 points, the estimator for variance sigma may be invalid")
 
-    lxx = np.sum(np.square(x)) - np.sqaure(np.mean(x)) * n
+    lxx = np.sum(np.square(x)) - np.square(np.mean(x)) * n
     if (lxx < 0):
         raise Exception("lxx < 0!")
     alpha = 1 - confidence
@@ -835,9 +905,9 @@ def msdRegression(df, columns = ["MSD_xy_mean"], confidence = 0.95):
         msdLog = np.log(df[col])
         return simpleLinearRegression(tLog, msdLog, confidence)
 
-def msdFittingPlot(df, columns = ["MSD_xy_mean"], threshold2_low = 0.6,threshold2_high = 0.8, \
-    threshold1_low = 1.6, threshold3_low = 0.8, region3start = -1, time_unit = "ps", msd_unit = "nm", outputUnit = "si", \
-        potentKnown = True, confidence = 0.95):
+def msdFittingPlot(df, columns = ["MSD_xy_mean"], threshold2_low = 0.3,threshold2_high = 0.8, \
+    threshold1_low = 1.6, threshold3_low = 0.8, region2start = -1, region3start = -1, time_unit = "ps", msd_unit = "nm", outputUnit = "si", \
+        potentKnown = True, confidence = 0.95, secondDerivThreshold = 0.6, method = "forward"):
     """
     plot the msd and the curve fitting
 
@@ -864,8 +934,13 @@ def msdFittingPlot(df, columns = ["MSD_xy_mean"], threshold2_low = 0.6,threshold
         offset_const = -18 * np.log(10) 
     else:
         raise Exception("currently does not support other units")
+
+    resultRegression = {}
     for col in columns:
-        list1, list2, list3, slopes = divide3Region(df,columns = [col], threshold2_low = threshold2_low, threshold2_high = threshold2_high, threshold1_low = threshold1_low, threshold3_low = threshold3_low, region3start = region3start)
+        list1, list2, list3, slopes = divide3Region(df,columns = [col], threshold2_low = threshold2_low, \
+            threshold2_high = threshold2_high, threshold1_low = threshold1_low, threshold3_low = threshold3_low, \
+                region2start = region2start, region3start = region3start, secondDerivThreshold= secondDerivThreshold,\
+                    method = method)
         indexLists = [list1,list2,list3]
         dfLists = [df.iloc[indexLists[var]] for var in range(3)]
         fig, axes = plt.subplots()
@@ -875,7 +950,11 @@ def msdFittingPlot(df, columns = ["MSD_xy_mean"], threshold2_low = 0.6,threshold
         msdLog = np.log(df[col])
         plt.plot(np.exp(tLog),np.exp(msdLog), label = legends[0])
         # plt.plot(tLog,msdLog, label = legends[0])
-
+        if (outputUnit == "si"):
+            resultRegression['units'] = "si"
+        else:
+            resultRegression['units'] = "nm_ps"
+        alpha_2Interval = []
         for i in range(3):
             regressionDict = msdRegression(dfLists[i], columns = [col], confidence = confidence)
             k = regressionDict['k']
@@ -888,23 +967,60 @@ def msdFittingPlot(df, columns = ["MSD_xy_mean"], threshold2_low = 0.6,threshold
                     b_1 = intercept_1
                 else:
                     b_1 = np.exp(b)
+                resultRegression['b1'] = b_1
+                resultRegression['b1_interval'] = regressionDict['b_interval']
                 k_1 = k
+                resultRegression['k1'] = k_1
+                resultRegression['k1_interval'] = regressionDict['k_interval']
             elif ( i == 1):
                 intercept_2 = np.exp(b_siunit)
                 alpha_2 = k
+                alpha_2Interval = regressionDict['k_interval']
+                resultRegression['alpha'] = k
+                resultRegression['alpha_interval'] = alpha_2Interval
             else:
                 intercept_3 = np.exp(b_siunit)
                 k_3 = k
                 if (outputUnit == "si"):
                     b_3 = intercept_3
+                    resultRegression['b3'] = b_3
                 else:
-                    b_3 = np.exp(b)                
+                    b_3 = np.exp(b)
+                    resultRegression['b3'] = b_3
+                resultRegression['k3'] = k_3
+                resultRegression['k3_interval'] = regressionDict['k_interval']
             # ts = np.log(dfLists[i]["time"])
             ts = np.log(df["time"])
             ys = k * ts + b
 
             plt.loglog(np.exp(ts), np.exp(ys), label = legends[i + 1], linestyle = "dashed")
             # plt.plot(ts, ys, label = legends[i + 1], linestyle = "dashed")
+        # calculate diffusion * d
+        if (outputUnit == "si"):
+            si_factor = (1e-6)
+            msd_factor = 1e-18
+            t_factor = 1e-12
+        else:
+            si_factor = 1
+            msd_factor = 1
+            t_factor = 1
+        D_from_raw_data = df.iloc[-101:-1][col]/(df.iloc[-101:-1]['time']) * si_factor
+        variance_name = col.split("_")
+        variance_name[-1] = "var"
+        variance_name = "_".join(variance_name)
+        # heuristic:
+        D_varList = df.iloc[-101:-1][variance_name]
+        Dcompact_var = np.sum(D_varList)/100 * msd_factor
+        D_std = np.sqrt(Dcompact_var)/(2 * df.iloc[-50]['time'] * t_factor)
+        sum =0
+        for i in D_from_raw_data:
+            sum = sum + i
+        Dd = sum/100
+        alpha = 1 - confidence
+        alphaHalfQuantile = norm.ppf(1 - alpha/2)
+        Dd_interval_len = D_std * alphaHalfQuantile
+        resultRegression['Dd'] = Dd
+        resultRegression['Dd_interval'] = [Dd - Dd_interval_len, Dd + Dd_interval_len]
         plt.legend()
         plt.show()
     constant1 = df.iloc[0][col] * 1e6 / np.square(df.iloc[0]["time"])
@@ -912,8 +1028,11 @@ def msdFittingPlot(df, columns = ["MSD_xy_mean"], threshold2_low = 0.6,threshold
     print("ballistic region, one point calculated const (d * kT/m):{0:.4e}, {1:.4e}".format(constant1, constant2))
     print("ballistic region, const (d * kT/m): {0:.4e}, potent: {1:.4f}".format(intercept_1, k_1))
     print("subdiffusion region, intercept: {0:.4e}, potent alpha: {1:.4f}".format(intercept_2, alpha_2))
+    print("confidence: {0:.4f}".format(confidence))
+    print("interval for alpha: ")
+    print(alpha_2Interval)
     print("brownian region, const (2dD): {0:.4e}, potent: {1:.4f}".format(intercept_3, k_3))
-    return b_1, alpha_2, b_3
+    return resultRegression
 
 if __name__ == "__main__":
     arr = np.array([2,3,4,5,6,8])

@@ -104,6 +104,22 @@ sys.float_info.epsilon
 
 also [interesting posts](https://stackoverflow.com/questions/34611858/machine-epsilon-in-python?lq=1) ,introduce `np.spacing` returns the next floating point
 
+* [string startswith](https://www.tutorialspoint.com/python/string_startswith.htm)
+
+```python
+mystr.startswith("a")
+```
+
+* [find the index of a boolean array where value is True](https://stackoverflow.com/questions/36941294/find-the-index-of-a-boolean-array-whose-values-are-true)
+
+```python
+boolArr = np.array([ True, False, False,  True,  True, False])
+np.where(boolArr)
+boolArr.nonzero()
+```
+
+both returns `(array([0, 3, 4]),)`
+
 ## os
 
 
@@ -223,6 +239,23 @@ plt.legend()
 plt.show()
 ```
 
+* [list as value](https://stackoverflow.com/questions/41500359/create-pandas-dataframe-with-list-as-values-in-rows/41501032)
+
+```python
+df = pd.DataFrame([{
+        'name':"hi",
+        "value":[1,2,3]
+    }])
+df
+```
+
+Output:
+
+```bash
+name	value
+0	hi	[1, 2, 3]
+```
+
 ## numpy
 
 * [numpy.select](https://numpy.org/doc/stable/reference/generated/numpy.select.html)
@@ -316,6 +349,16 @@ Correct version is `model = LinearRegression().fit(tLog,msdLog)`
 #### general
 
 * [python not working in command line](https://stackoverflow.com/questions/13596505/python-not-working-in-command-prompt)
+
+```python
+/gruppe_1/students_code/pythonSource/statisticsAnalysis.py in findLowUpIndex(arr, lowBound, upBound, startIndex, endIndex, userIsKing)
+    690     if (startIndex < 0):
+    691         tempStart = 0
+--> 692     arrSlice = arr[tempStart : endIndex]
+    693     arrSlice_low = min(arrSlice)
+    694     arrSlice_max = max(arrSlice)
+UnboundLocalError: local variable 'tempStart' referenced before assignment
+```
 
 #### os 
 

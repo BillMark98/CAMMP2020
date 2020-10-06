@@ -24,7 +24,7 @@ def containsFiles(currentPath, extension = ".csv"):
         
     return False
 
-def getSubDir(currentPath, extension = ".csv"):
+def getSubDir(currentPath, extension = ".csv", beginWith = ''):
     """
     Get all subdirectories of the current path, that contains the ".csv" file
 
@@ -35,13 +35,17 @@ def getSubDir(currentPath, extension = ".csv"):
     currentPath: str
     string that indicate the current working directory
 
+    beginWith: str
+    only select those that begins with the suffix beginWith
+
     """
 
     dirLists = []
     for root, dirs,_ in os.walk(currentPath):
         for d in dirs:
             if containsFiles(os.path.join(root,d), extension):
-                dirLists.append(os.path.join(root,d))
+                if(len(beginWith) == 0 or d.startswith(beginWith)):
+                    dirLists.append(os.path.join(root,d))
     return dirLists    
 
 def getFiles(fileDir, extension= ".csv", fileNum = sizeInf):
@@ -116,6 +120,7 @@ def getMoleculeConentration(composition, delimiter = "_"):
         moleculeCompositionDict[m.group(1)] = m.group(2)
     print(moleculeCompositionDict)
     return moleculeCompositionDict
+
 def getNumbering(fileName):
     """
     Get the numbering of the fileName
@@ -216,4 +221,5 @@ if __name__ == "__main__":
     #         df2 = df2.append(df)
 
     # df2.to_csv("./Plotting/jupyter/raw_data.csv")
-    getMoleculeConentration("DOPC50_CHOL50")
+    dictDC = getMoleculeConentration("DOPC50_CHOL50")
+    print(dictDC)
