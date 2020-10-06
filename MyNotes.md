@@ -281,6 +281,16 @@ print('intercept:', model.intercept_)
 print('slope:', model.coef_)  # the slope
 ```
 
+* remember to do a fit, need to add `()` before the `LinearRegression` 
+
+```python
+    7 model = LinearRegression.fit(tLog,msdLog)   # <---------- forget parenthes
+    8 print("k:{0:4e}, b: {1:4e}".format(model.coef_, model.intercept_))
+TypeError: fit() missing 1 required positional argument: 'y'
+```
+
+Correct version is `model = LinearRegression().fit(tLog,msdLog)`
+
 ## jupyter
 
 * use `stdin` to import file written in `vim`
@@ -325,6 +335,7 @@ I think sth like `pd.read_csv(fileName, header = 0, columns = myColumnName)`
 df["newcolumn"] = listLikeStructure # add column
 df.insert(listLikeStructure)  # add new row
 ```
+* [error bar](https://stackoverflow.com/questions/21469620/how-to-do-linear-regression-taking-errorbars-into-account)
 
 #### numpy
 

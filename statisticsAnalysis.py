@@ -3,6 +3,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.stats import shapiro
 from scipy.stats import chisquare
+from scipy.stats import t
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error
 import fileIO
@@ -767,7 +768,7 @@ def divide3Region(df, columns = ["MSD_xy_mean"],threshold2_low = 0.3,threshold2_
         list3 = list(range(l3,len(slopes)))
         return list1, list2, list3, slopes
 
-def simpleLinearRegression(xArr,yArr):
+def simpleLinearRegression(xArr,yArr, confidence = 0.95):
     """
     do a linear regression s.t yArr_approx = k * xArr + b
 
@@ -775,14 +776,35 @@ def simpleLinearRegression(xArr,yArr):
     Parameters:
     ----
 
-    return: k,b,mean_squared_error, confidenceInterval of k, confidenceInterval of b
+    return: dictionary which includes k,b,mean_squared_error,confidence level,  confidenceInterval of k, confidenceInterval of b
     """
     model = LinearRegression().fit(xArr,yArr)
-    # yPred = LinearRegression().
-    # mean_sqre_error = mean_sqre_error()
-    return model.coef_, model.intercept_
+    x = xArr.flatten()
+    yPred = model.predict(x)
+    n = len(x)
+    if (n > 2):
+        mean_sqre_error = mean_squared_error(yPred,yArr) * n / (n - 2)
+    else :
+        mean_sqre_error = mean_squared_error(yPred,yArr)
+        print("less than 2 points, the estimator for variance sigma may be invalid")
 
-def msdRegression(df, columns = ["MSD_xy_mean"]):
+    lxx = np.sum(np.square(x)) - np.sqaure(np.mean(x)) * n
+    if (lxx < 0):
+        raise Exception("lxx < 0!")
+    alpha = 1 - confidence
+    alphaHalfQuantile = t(df = n).ppf(1 - alpha/2)
+    k_interval_len = np.sqrt(mean_sqre_error/lxx)
+    k = model.coef_[0]
+    k_low = k - alphaHalfQuantile * k_interval_len
+    k_high = k + alphaHalfQuantile * k_interval_len
+
+    b = model.intercept_
+    b_interval_len = np.sqrt(mean_sqre_error * (1/n + np.square(np.mean(x))/lxx))
+    b_low = b - b_interval_len * alphaHalfQuantile
+    b_high = b + b_interval_len * alphaHalfQuantile
+    return {'k': k, 'b': b, 'mean_square_error': mean_sqre_error, 'confidence': confidence, 'k_interval': [k_low, k_high], 'b_interval': [b_low, b_high]}
+
+def msdRegression(df, columns = ["MSD_xy_mean"], confidence = 0.95):
     """
     do a linear regression s.t log(columns) = k * log(time) + b
 
@@ -795,7 +817,7 @@ def msdRegression(df, columns = ["MSD_xy_mean"]):
     Parmaeters:
     -----
 
-    return: k, b, mean_squared_error, confidenceInterval of k, confidenceInterval of b
+    return: dictionary which includes k,b,mean_squared_error,confidence level,  confidenceInterval of k, confidenceInterval of b
 
     ----
     To do:
@@ -811,9 +833,11 @@ def msdRegression(df, columns = ["MSD_xy_mean"]):
 
     for col in columns:
         msdLog = np.log(df[col])
-        return simpleLinearRegression(tLog, msdLog)
+        return simpleLinearRegression(tLog, msdLog, confidence)
 
-def msdFittingPlot(df, columns = ["MSD_xy_mean"], threshold2_low = 0.6,threshold2_high = 0.8, threshold1_low = 1.6, threshold3_low = 0.8, region3start = -1, time_unit = "ps", msd_unit = "nm", outputUnit = "si"):
+def msdFittingPlot(df, columns = ["MSD_xy_mean"], threshold2_low = 0.6,threshold2_high = 0.8, \
+    threshold1_low = 1.6, threshold3_low = 0.8, region3start = -1, time_unit = "ps", msd_unit = "nm", outputUnit = "si", \
+        potentKnown = True, confidence = 0.95):
     """
     plot the msd and the curve fitting
 
@@ -853,21 +877,24 @@ def msdFittingPlot(df, columns = ["MSD_xy_mean"], threshold2_low = 0.6,threshold
         # plt.plot(tLog,msdLog, label = legends[0])
 
         for i in range(3):
-            k,b = msdRegression(dfLists[i], columns = [col])
-            b_siunit = b + offset_alpha * k[0] + offset_const
+            regressionDict = msdRegression(dfLists[i], columns = [col], confidence = confidence)
+            k = regressionDict['k']
+            b = regressionDict['b']
+            
+            b_siunit = b + offset_alpha * k + offset_const
             if (i == 0):
                 intercept_1 = np.exp(b_siunit)
                 if (outputUnit == "si"):
                     b_1 = intercept_1
                 else:
                     b_1 = np.exp(b)
-                k_1 = k[0]
+                k_1 = k
             elif ( i == 1):
                 intercept_2 = np.exp(b_siunit)
-                alpha_2 = k[0]
+                alpha_2 = k
             else:
                 intercept_3 = np.exp(b_siunit)
-                k_3 = k[0]
+                k_3 = k
                 if (outputUnit == "si"):
                     b_3 = intercept_3
                 else:
@@ -881,7 +908,8 @@ def msdFittingPlot(df, columns = ["MSD_xy_mean"], threshold2_low = 0.6,threshold
         plt.legend()
         plt.show()
     constant1 = df.iloc[0][col] * 1e6 / np.square(df.iloc[0]["time"])
-    print("ballistic region, one point calculated const (d * kT/m):{0:.4e}".format(constant1))
+    constant2 = df.iloc[1][col] * 1e6 / np.square(df.iloc[1]["time"])
+    print("ballistic region, one point calculated const (d * kT/m):{0:.4e}, {1:.4e}".format(constant1, constant2))
     print("ballistic region, const (d * kT/m): {0:.4e}, potent: {1:.4f}".format(intercept_1, k_1))
     print("subdiffusion region, intercept: {0:.4e}, potent alpha: {1:.4f}".format(intercept_2, alpha_2))
     print("brownian region, const (2dD): {0:.4e}, potent: {1:.4f}".format(intercept_3, k_3))
