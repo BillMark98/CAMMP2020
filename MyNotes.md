@@ -388,3 +388,5 @@ df.insert(listLikeStructure)  # add new row
 
 * [python mittag-leffler instability](https://stackoverflow.com/questions/48645381/instability-in-mittag-leffler-function-using-numpy), 
 I think it's caused by the divergence of the series representation of the functioin for |z| > 1
+
+* [confidence interval of a function](https://stats.stackexchange.com/questions/55441/how-to-calculate-the-confidence-interval-of-a-function-of-a-combination-of-two-l)

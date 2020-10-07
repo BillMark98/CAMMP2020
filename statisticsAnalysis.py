@@ -207,7 +207,7 @@ def merge2TimeScale(df1, df2, columns = ["MSD_xy_mean","MSD_z"]):
     if (len(df1) != len(df2)):
         print(l1)
         print(l2)
-        raise Exception("findCommonPoints error, returned list1 and 2 not equal length!")
+        raise Exception("findCommonPoints error, findCommonPoints returned list1 and 2 not equal length!")
     for col in columns:
         minDiff = INFINITY
         minIndex = -1
@@ -216,7 +216,8 @@ def merge2TimeScale(df1, df2, columns = ["MSD_xy_mean","MSD_z"]):
             if (difference < minDiff):
                 minDiff = difference
                 minIndex = i
-        
+        timePt = df1.iloc[minIndex]["time"]
+
 def chooseIndex(indices, num, lowPercentile = 0, upPercentile = 1):
     """
     choose indices from [lowPercentile * len, upPercentile * len]:
@@ -982,11 +983,14 @@ def msdFittingPlot(df, columns = ["MSD_xy_mean"], threshold2_low = 0.3,threshold
                 intercept_3 = np.exp(b_siunit)
                 k_3 = k
                 if (outputUnit == "si"):
-                    b_3 = intercept_3
-                    resultRegression['b3'] = b_3
+                    print("for b_3 only nm_ps units")
+                    b_3 = np.exp(b)
+                    # b_3 = intercept_3
                 else:
                     b_3 = np.exp(b)
-                    resultRegression['b3'] = b_3
+                resultRegression['b3'] = b_3
+                resultRegression['b3_interval'] = np.exp(regressionDict['b_interval'])
+
                 resultRegression['k3'] = k_3
                 resultRegression['k3_interval'] = regressionDict['k_interval']
             # ts = np.log(dfLists[i]["time"])
