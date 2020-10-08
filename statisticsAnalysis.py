@@ -124,51 +124,7 @@ def findCommonPoints(list1, list2, as_series = True):
 
         raise Exception("Non arithmetic increase not supported yet!")    
 
-def calculateMeanVarMedian(df, columns = ["MSD_x", "MSD_y", "MSD_z", "MSD_xy"], dropXY = True):
-    """
-    calculate the useful statistics, mean, variance, median, rename the column accordingly,
-    dropXY indicate whether to drop the column MSD_x and MSD_y
 
-    --------
-    Parameters:
-    --------
-
-    df: dataframe
-
-    columns: list like
-    specify what statistics will be calculated for
-
-    dropXY: bool
-
-    return: dataframe containing the statistics
-
-    -----
-    Assume
-    ------
-    df has column called "time" and "trajectory"
-    """
-    
-    # drop "MSD_x" and "MSD_y" if needed
-    if (dropXY):
-        if ("MSD_x" in columns):
-            columns.remove("MSD_x")
-        if ("MSD_y" in columns):
-            columns.remove("MSD_y")
-        df.drop(["MSD_x","MSD_y"], axis = 1, errors = "ignore", inplace = True)
-
-    df_mean = df.groupby(["time"], as_index = False).mean().drop(["trajectory"], axis = 1)
-    mean_dict = {key : key + "_mean" for key in columns}
-    df_mean.rename(columns = mean_dict, inplace = True)
-
-    df_median = df.groupby(["time"], as_index = False).median().drop(["time","trajectory"], axis = 1)
-    median_dict = {key : key + "_median" for key in columns}
-    df_median.rename(columns = median_dict, inplace = True)
-
-    df_var = df.groupby(["time"], as_index = False).var().drop(["time", "trajectory"], axis = 1)
-    var_dict = {key : key + "_var" for key in columns}
-    df_var.rename(columns = var_dict, inplace = True)
-
-    return pd.concat([df_mean,df_median, df_var], axis = 1)
 
 def merge2TimeScale(df1, df2, columns = ["MSD_xy_mean","MSD_z"]):
     """
@@ -756,6 +712,16 @@ def getLogLogSlope(df, yColumn = ["MSD_xy_mean"], xColumn = ["time"], method = "
             slopes = msdLogDiff / tLogDiff
             return slopes
 
+def plotLogLog(df, yColumn = ["MSD_xy_mean"], label = ""):
+    """
+        print the loglog
+    """
+    df_prune = eliminateZeroTime(df)
+    tLog = np.log(df["time"])
+    for col in yColumn:
+        yLog = np.log(df[col])
+        plt.loglog(np.exp(tLog),np.exp(yLog), label = label)
+
 def divide3Region(df, columns = ["MSD_xy_mean"],threshold2_low = 0.3,threshold2_high = 0.8, \
     threshold1_low = 1.6, threshold3_low = 0.8, region2start = -1, region3start = -1, secondDerivThreshold = 0.6, \
         indexJump = 20, method = "forward"):
@@ -908,7 +874,7 @@ def msdRegression(df, columns = ["MSD_xy_mean"], confidence = 0.95):
 
 def msdFittingPlot(df, columns = ["MSD_xy_mean"], threshold2_low = 0.3,threshold2_high = 0.8, \
     threshold1_low = 1.6, threshold3_low = 0.8, region2start = -1, region3start = -1, time_unit = "ps", msd_unit = "nm", outputUnit = "si", \
-        potentKnown = True, confidence = 0.95, secondDerivThreshold = 0.6, method = "forward"):
+        potentKnown = True, confidence = 0.95, secondDerivThreshold = 0.6, method = "forward", title = "", directShow = True):
     """
     plot the msd and the curve fitting
 
@@ -960,8 +926,12 @@ def msdFittingPlot(df, columns = ["MSD_xy_mean"], threshold2_low = 0.3,threshold
             regressionDict = msdRegression(dfLists[i], columns = [col], confidence = confidence)
             k = regressionDict['k']
             b = regressionDict['b']
-            
+            b_interval = np.array(regressionDict['b_interval'])
             b_siunit = b + offset_alpha * k + offset_const
+            b_si_interval = b_interval + offset_alpha * k + offset_const
+            ts = np.log(df["time"])
+            ys = k * ts + b
+            legend = legends[i + 1]           
             if (i == 0):
                 intercept_1 = np.exp(b_siunit)
                 if (outputUnit == "si"):
@@ -979,25 +949,33 @@ def msdFittingPlot(df, columns = ["MSD_xy_mean"], threshold2_low = 0.3,threshold
                 alpha_2Interval = regressionDict['k_interval']
                 resultRegression['alpha'] = k
                 resultRegression['alpha_interval'] = alpha_2Interval
+                legend += ":{0:.5f}".format(k)
             else:
                 intercept_3 = np.exp(b_siunit)
                 k_3 = k
                 if (outputUnit == "si"):
                     print("for b_3 only nm_ps units")
-                    b_3 = np.exp(b)
-                    # b_3 = intercept_3
+                    # b_3 = np.exp(b)
+                    if (potentKnown == False):
+                        print("The result for the errorbar of 2dD may be inaccurate!")
+                        b_3 = intercept_3                        
+                        b_3_interval = b_si_interval
+                    else:
+                        b_3 = np.exp(b) * 1e-6
+                        b_3_interval = b_interval # move the multiplication of 1e-6 at the end
                 else:
                     b_3 = np.exp(b)
+                    b_3_interval = b_interval
                 resultRegression['b3'] = b_3
-                resultRegression['b3_interval'] = np.exp(regressionDict['b_interval'])
-
+                resultRegression['b3_interval'] = np.exp(b_3_interval)
+                if (outputUnit == "si" and potentKnown):
+                    resultRegression['b3_interval'] *= 1e-6
                 resultRegression['k3'] = k_3
                 resultRegression['k3_interval'] = regressionDict['k_interval']
             # ts = np.log(dfLists[i]["time"])
-            ts = np.log(df["time"])
-            ys = k * ts + b
 
-            plt.loglog(np.exp(ts), np.exp(ys), label = legends[i + 1], linestyle = "dashed")
+
+            plt.loglog(np.exp(ts), np.exp(ys), label = legend, linestyle = "dashed")
             # plt.plot(ts, ys, label = legends[i + 1], linestyle = "dashed")
         # calculate diffusion * d
         if (outputUnit == "si"):
@@ -1026,7 +1004,9 @@ def msdFittingPlot(df, columns = ["MSD_xy_mean"], threshold2_low = 0.3,threshold
         resultRegression['Dd'] = Dd
         resultRegression['Dd_interval'] = [Dd - Dd_interval_len, Dd + Dd_interval_len]
         plt.legend()
-        plt.show()
+        plt.title(title)
+        if (directShow):
+            plt.show()
     constant1 = df.iloc[0][col] * 1e6 / np.square(df.iloc[0]["time"])
     constant2 = df.iloc[1][col] * 1e6 / np.square(df.iloc[1]["time"])
     print("ballistic region, one point calculated const (d * kT/m):{0:.4e}, {1:.4e}".format(constant1, constant2))

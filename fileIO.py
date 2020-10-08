@@ -146,7 +146,7 @@ def createPDF(currentPath, extension = ".csv" , fileNum = sizeInf):
     create the pandas dataframe based on all the csv file from the currentPath
     
     """
-    index = ["time","MSD_x","MSD_y","MSD_z","concentration","samplingrate","trajectory","molecule"]
+    index = ["time","MSD_x","MSD_y","MSD_z","concentration","samplingrate","trajectory","molecule", "MSD_xy","MSD_xyz"]
     index2 = ["time","MSD_x","MSD_y","MSD_z"]
     df2 = pd.DataFrame(columns = index)
     fileNameLists = getFiles(currentPath, extension, fileNum)
@@ -160,6 +160,7 @@ def createPDF(currentPath, extension = ".csv" , fileNum = sizeInf):
         df["samplingrate"] = samplingrate
         df["concentration"] = concentration
         df["MSD_xy"] = df["MSD_x"] + df["MSD_y"]
+        df["MSD_xyz"] = df["MSD_xy"] + df["MSD_z"]
         df2 = df2.append(df)
     return df2
 

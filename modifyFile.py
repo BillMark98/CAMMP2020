@@ -77,6 +77,7 @@ def modifyMSD(readFilePath, writeFilePath):
         for i in range(indexLen):
             # writeFile.write("%20s %20s %20s %20s\n" %(timeArr[i], xMSD[i], yMSD[i],zMSD[i]))
             writeFile.write("%s,%s,%s,%s\n" %(timeArr[i], xMSD[i], yMSD[i],zMSD[i]))
+
 def generateMSDFinal(readDataFileParentPath, writeDataFileParentPath):
     """
     Generate the final msd files

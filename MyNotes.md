@@ -14,6 +14,9 @@ import myModule
 
 ## basic python
 
+* [test type](https://stackoverflow.com/questions/2225038/determine-the-type-of-an-object)
+use `type()` to tell direct type and `isinstance()` to find out the inheritance.
+
 * [create sequence between 2 values](https://stackoverflow.com/questions/18265935/python-create-list-with-numbers-between-2-values)
 
 ```python
@@ -140,6 +143,19 @@ use `set(myList)`
 
 ## pandas
 
+* [read_csv index_col = 0,None,False](https://stackoverflow.com/questions/29862864/different-read-csv-index-col-none-0-false-in-pandas)
+
+`index_col = 0` will treat the first column as index, whereas `None` and `False` will treat the first column as a data column and will add
+an extra `Unnamed: 0` column for indexing.  Another interesting thing from the link is the usage:
+
+```python
+import io
+import pandas as pd
+t = """,a,b
+0,hello,pandas"""
+pd.read_csv(io.StringIO(t))
+```
+
 * [index error using axes](https://stackoverflow.com/questions/28442285/indexerror-when-plotting-subplots-in-pandas/40168092)
 basically, it's because if it is `N * 1` or `1 * N` only one variable needs to be specified, so instead of
 `myDataframe.plot(ax = [i,0])` use `myDataframe.plot(ax = [i])`
@@ -256,6 +272,17 @@ name	value
 0	hi	[1, 2, 3]
 ```
 
+* [apply mean on list, which is an entry in a pandas](https://stackoverflow.com/questions/26806054/how-to-use-lists-as-values-in-pandas-dataframe)
+
+two methods,
+
+1. divide lists into columns. And group by conditions to calculate the mean
+2. use `apply` 
+
+```python
+df['listvalue'].apply(numpy.mean)
+```
+
 ## numpy
 
 * [numpy.select](https://numpy.org/doc/stable/reference/generated/numpy.select.html)
@@ -289,7 +316,61 @@ fig.tight_layout(pad = 5.0)
 the command `plt.hold(True)` is deprecated, now simply add plot use command `plt.plot(...)` and at the end `plt.show()` will plot all lines
 into one figure
 
+* [cannot perform reduce with flexible type](https://stackoverflow.com/questions/43442415/cannot-perform-reduce-with-flexible-type/43443554)
+like:
 
+```python
+TypeError                                 Traceback (most recent call last)
+<ipython-input-16-30c02975f4be> in <module>
+----> 1 diffAna.plotAlpha(DOPC_alpha)
+
+~/gruppe_1/students_code/pythonSource/diffusionAnalysis.py in plotAlpha(dfAlpha, ms)
+    176     print(yerror)
+    177     # plt.plot(x,y)
+--> 178     plt.errorbar(x,y,yerr = [yerror,yerror] , fmt = ' ',ms = ms,ecolor= 'magenta')
+    179     plt.xlabel("cholesterol_concentration")
+    180     plt.xticks([0,25,50])
+/usr/lib/python3/dist-packages/matplotlib/pyplot.py in errorbar(x, y, yerr, xerr, fmt, ecolor, elinewidth, capsize, barsabove, lolims, uplims, xlolims, xuplims, errorevery, capthick, data, **kwargs)
+   2547         uplims=False, xlolims=False, xuplims=False, errorevery=1,
+   2548         capthick=None, *, data=None, **kwargs):
+-> 2549     return gca().errorbar(
+   2550         x, y, yerr=yerr, xerr=xerr, fmt=fmt, ecolor=ecolor,
+   2551         elinewidth=elinewidth, capsize=capsize, barsabove=barsabove,
+/usr/lib/python3/dist-packages/matplotlib/__init__.py in inner(ax, data, *args, **kwargs)
+   1599     def inner(ax, *args, data=None, **kwargs):
+   1600         if data is None:
+-> 1601             return func(ax, *map(sanitize_sequence, args), **kwargs)
+   1602 
+   1603         bound = new_sig.bind(ax, *args, **kwargs)
+/usr/lib/python3/dist-packages/matplotlib/axes/_axes.py in errorbar(self, x, y, yerr, xerr, fmt, ecolor, elinewidth, capsize, barsabove, lolims, uplims, xlolims, xuplims, errorevery, capthick, **kwargs)
+   3428                 xo, _ = xywhere(x, lower, noylims & everymask)
+   3429                 lo, uo = xywhere(lower, upper, noylims & everymask)
+-> 3430                 barcols.append(self.vlines(xo, lo, uo, **eb_lines_style))
+   3431                 if capsize > 0:
+   3432                     caplines.append(mlines.Line2D(xo, lo, marker='_',
+/usr/lib/python3/dist-packages/matplotlib/__init__.py in inner(ax, data, *args, **kwargs)
+   1599     def inner(ax, *args, data=None, **kwargs):
+   1600         if data is None:
+-> 1601             return func(ax, *map(sanitize_sequence, args), **kwargs)
+   1602 
+   1603         bound = new_sig.bind(ax, *args, **kwargs)
+/usr/lib/python3/dist-packages/matplotlib/axes/_axes.py in vlines(self, x, ymin, ymax, colors, linestyles, label, **kwargs)
+   1199 
+   1200         if len(x) > 0:
+-> 1201             minx = x.min()
+   1202             maxx = x.max()
+   1203             miny = min(ymin.min(), ymax.min())
+/usr/lib/python3/dist-packages/numpy/core/_methods.py in _amin(a, axis, out, keepdims, initial, where)
+     32 def _amin(a, axis=None, out=None, keepdims=False,
+     33           initial=_NoValue, where=True):
+---> 34     return umr_minimum(a, axis, None, out, keepdims, initial, where)
+     35 
+     36 def _sum(a, axis=None, dtype=None, out=None, keepdims=False,
+TypeError: cannot perform reduce with flexible type
+```
+
+Usually, it's caused by there are some not numerical values in the x, or y, or yerror. Check all values are numerical values, in particular, not
+string like `'50'`
 
 ## re
 
@@ -303,6 +384,13 @@ m.group(2) # '231'
 ```
 
 ## statistics
+
+* [scikit.metrics.mean_squared_error](https://scikit-learn.org/stable/modules/generated/sklearn.metrics.mean_squared_error.html)
+
+the `mean_squared_error` calulate `1/n * \sum_{i = 1}^{n} (x(i) - y(i))^2` in particular, to calculate the `sigma^2` for the linear regression,
+remember to multiply ` n/(n-2)`
+
+[slides for linear regression error analysis](https://www2.isye.gatech.edu/~yxie77/isye2028/lecture12.pdf)
 
 * [pandas normality test](https://machinelearningmastery.com/a-gentle-introduction-to-normality-tests-in-python/), [ways to test normality](https://towardsdatascience.com/6-ways-to-test-for-a-normal-distribution-which-one-to-use-9dcf47d8fa93)
 
@@ -324,6 +412,11 @@ TypeError: fit() missing 1 required positional argument: 'y'
 
 Correct version is `model = LinearRegression().fit(tLog,msdLog)`
 
+* [normal quantile](https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.norm.html)
+
+```python
+    quantile_95 = norm.ppf(0.95)
+```
 ## jupyter
 
 * use `stdin` to import file written in `vim`
@@ -347,6 +440,8 @@ Correct version is `model = LinearRegression().fit(tLog,msdLog)`
 ### python
 
 #### general
+
+* [check nan](https://stackoverflow.com/questions/944700/how-can-i-check-for-nan-values)
 
 * [python not working in command line](https://stackoverflow.com/questions/13596505/python-not-working-in-command-prompt)
 
@@ -378,11 +473,23 @@ I think sth like `pd.read_csv(fileName, header = 0, columns = myColumnName)`
 df["newcolumn"] = listLikeStructure # add column
 df.insert(listLikeStructure)  # add new row
 ```
+
 * [error bar](https://stackoverflow.com/questions/21469620/how-to-do-linear-regression-taking-errorbars-into-account)
+also [here](https://towardsdatascience.com/the-quick-and-easy-way-to-plot-error-bars-in-python-using-pandas-a4d5cca2695d) and [here](https://stackoverflow.com/questions/23000418/adding-error-bars-to-grouped-bar-plot-in-pandas)
+
+* [fill a column with values](https://stackoverflow.com/questions/34811971/how-do-i-fill-a-column-with-one-value-in-pandas/34811984)
+
+* warning:
+`A value is trying to be set on a copy of a slice from a DataFrame.`
+[SettingWithCopyWarning](https://stackoverflow.com/questions/20625582/how-to-deal-with-settingwithcopywarning-in-pandas) and  [here](https://www.dataquest.io/blog/settingwithcopywarning/)
 
 #### numpy
 
 * [interesting posts](https://stackoverflow.com/questions/34611858/machine-epsilon-in-python?lq=1) ,introduce `np.spacing` returns the next floating point
+
+#### matplotlib
+
+* [tick label scientifc](https://matplotlib.org/3.3.1/api/_as_gen/matplotlib.axes.Axes.ticklabel_format.html)
 
 ### theory
 
@@ -390,3 +497,5 @@ df.insert(listLikeStructure)  # add new row
 I think it's caused by the divergence of the series representation of the functioin for |z| > 1
 
 * [confidence interval of a function](https://stats.stackexchange.com/questions/55441/how-to-calculate-the-confidence-interval-of-a-function-of-a-combination-of-two-l)
+
+* richardson extrapolation

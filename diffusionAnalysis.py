@@ -9,6 +9,13 @@ import matplotlib.pyplot as plt
 import fileIO
 import statisticsAnalysis as stAna
 
+defaultColor = 'black'
+defaultCapsize = 8
+defaultElinewidth = 6
+defaultDPI = 300
+defaultFigWidth = 15
+defaultFigHeight = 10
+defaultPad = 20
 def generateAlpha(dirLists, columns = ["MSD_xy_mean"], threshold2_low = 0.3,threshold2_high = 0.8, \
     threshold1_low = 1.6, threshold3_low = 0.8, region2start = -1, region3start = -1, time_unit = "ps", msd_unit = "nm", outputUnit = "si", \
         potentKnown = True, confidence = 0.95, secondDerivThreshold = 0.6):
@@ -28,24 +35,34 @@ def generateAlpha(dirLists, columns = ["MSD_xy_mean"], threshold2_low = 0.3,thre
         for dir in dirLists:
             fileLists = fileIO.getFiles(dir)
             folderName = dir.split("/")[-1]
+            moleculeConcentration = fileIO.getMoleculeConentration(folderName)
+            # moleculeConcentration['MIX'] = np.nan
             for file in fileLists:
                 molecule = file.split("/")[-1].split(".")[0]
-                moleculeConcentration = fileIO.getMoleculeConentration(folderName)
-                cholesterol_concentration = int(moleculeConcentration[molecule])
-                if (molecule != "CHOL"):
+                if (molecule != "MIX"):
+                    cholesterol_concentration = int(moleculeConcentration[molecule])
+                else :
+                    cholesterol_concentration = int(moleculeConcentration["CHOL"])
+                if (molecule != "CHOL" and molecule != "MIX"):
                     cholesterol_concentration = 100.0 - cholesterol_concentration
                 # treat the first column as the index
-                df = pd.read_csv(file, index_col= 0) 
+                df = pd.read_csv(file, index_col= False) 
+                # drops unneeded unnamed column if there is 
+                df.drop(['Unnamed: 0'], axis = 1, errors = 'ignore')                
                 regressionDict = stAna.msdFittingPlot(df, columns = [col], threshold2_low= threshold2_low, threshold2_high = threshold2_high,\
                     threshold1_low = threshold1_low, threshold3_low = threshold3_low, region2start = region2start, region3start = region3start, \
                         time_unit = time_unit, msd_unit = msd_unit, outputUnit = outputUnit, potentKnown = potentKnown, confidence = confidence, secondDerivThreshold = secondDerivThreshold)
                 alpha = regressionDict['alpha']
                 alpha_interval = regressionDict['alpha_interval']
                 alpha_errorbar = alpha_interval[1] - alpha
+                if (molecule != 'MIX'):
+                    molecule_concen = int(moleculeConcentration[molecule])
+                else:
+                    molecule_concen = np.nan
                 df_current = pd.DataFrame([{
                     'foldername': folderName,
                     'molecule': molecule,
-                    'concentration': int(moleculeConcentration[molecule]),
+                    'concentration': molecule_concen,
                     'cholesterol_concentration': cholesterol_concentration,
                     'confidence': confidence,
                     'alpha': alpha,
@@ -76,6 +93,9 @@ def generateDiffusionConst(dirLists, dim,  columns = ["MSD_xy_mean"], threshold2
         unitEntry = time_unit + "_" + msd_unit
     for col in columns:
         dfFinal = pd.DataFrame(columns = ["foldername","molecule","concentration","cholesterol_concentration","unit", "confidence","diffusion_coeff","diffusion_errorbar"])
+
+        if (outputUnit == "si" and (not potentKnown)) :
+            print("The result for the errorbar of 2dD may be inaccurate!")
         for dir in dirLists:
             fileLists = fileIO.getFiles(dir)
             folderName = dir.split("/")[-1]
@@ -83,35 +103,36 @@ def generateDiffusionConst(dirLists, dim,  columns = ["MSD_xy_mean"], threshold2
             cholesterol_concentration = 0
             for file in fileLists:
                 molecule = file.split("/")[-1].split(".")[0]
-                cholesterol_concentration = int(moleculeConcentration[molecule])
-                if (molecule != "CHOL"):
-                    cholesterol_concentration = 100.0 - cholesterol_concentration
-                # treat the first column as the index
-                df = pd.read_csv(file, index_col= 0) 
-                regressionDict = stAna.msdFittingPlot(df, columns = [col], threshold2_low= threshold2_low, threshold2_high = threshold2_high,\
-                    threshold1_low = threshold1_low, threshold3_low = threshold3_low, region2start = region2start, region3start = region3start, \
-                        time_unit = time_unit, msd_unit = msd_unit, outputUnit = outputUnit, potentKnown = potentKnown, confidence = confidence, secondDerivThreshold = secondDerivThreshold)
-                if (useRegression) :
-                    Dd = regressionDict['b3']
-                    Dd_interval = regressionDict['b3_interval']
-                else:
-                    Dd = regressionDict['Dd']
-                    Dd_interval = regressionDict['Dd_interval']
+                if (molecule != "MIX"):
+                    cholesterol_concentration = int(moleculeConcentration[molecule])
+                    if (molecule != "CHOL"):
+                        cholesterol_concentration = 100.0 - cholesterol_concentration
+                    # treat the first column as the index
+                    df = pd.read_csv(file, index_col= 0) 
+                    regressionDict = stAna.msdFittingPlot(df, columns = [col], threshold2_low= threshold2_low, threshold2_high = threshold2_high,\
+                        threshold1_low = threshold1_low, threshold3_low = threshold3_low, region2start = region2start, region3start = region3start, \
+                            time_unit = time_unit, msd_unit = msd_unit, outputUnit = outputUnit, potentKnown = potentKnown, confidence = confidence, secondDerivThreshold = secondDerivThreshold)
+                    if (useRegression) :
+                        Dd = regressionDict['b3']
+                        Dd_interval = regressionDict['b3_interval']
+                    else:
+                        Dd = regressionDict['Dd']
+                        Dd_interval = regressionDict['Dd_interval']
 
-                D = Dd / dim
-                D_errorbar_high = (Dd_interval[1] - Dd) / dim
-                D_errorbar_low = (Dd - Dd_interval[0])/dim
-                df_current = pd.DataFrame([{
-                    'foldername': folderName,
-                    'molecule': molecule,
-                    'concentration': int(moleculeConcentration[molecule]),
-                    'cholesterol_concentration': cholesterol_concentration,
-                    "unit": unitEntry,
-                    'confidence': confidence,
-                    'diffusion_coeff': D,
-                    'diffusion_errorbar': [D_errorbar_low, D_errorbar_high]
-                }])
-                dfFinal = dfFinal.append(df_current, ignore_index = True)
+                    D = Dd / dim
+                    D_errorbar_high = (Dd_interval[1] - Dd) / dim
+                    D_errorbar_low = (Dd - Dd_interval[0])/dim
+                    df_current = pd.DataFrame([{
+                        'foldername': folderName,
+                        'molecule': molecule,
+                        'concentration': int(moleculeConcentration[molecule]),
+                        'cholesterol_concentration': cholesterol_concentration,
+                        "unit": unitEntry,
+                        'confidence': confidence,
+                        'diffusion_coeff': D,
+                        'diffusion_errorbar': [D_errorbar_low, D_errorbar_high]
+                    }])
+                    dfFinal = dfFinal.append(df_current, ignore_index = True)
             # mixture
             if (len(moleculeConcentration) > 1):
                 # there is a mixture
@@ -140,13 +161,16 @@ def generateDiffusionConst(dirLists, dim,  columns = ["MSD_xy_mean"], threshold2
     return dfFinal
 
 
-def plotAlpha(dfAlpha):
+def plotAlpha(dfAlpha, ms = 8, ecolor = defaultColor, elinewidth = defaultElinewidth, capsize = defaultCapsize, dpi = defaultDPI, figWidh = defaultFigWidth, figHeight = defaultFigHeight, labelpad = defaultPad):
     groups = dfAlpha.groupby('molecule')
     x = []
     y = []
     yerror = []
+    fig,ax = plt.subplots()
+    fig.set_size_inches(defaultFigWidth, defaultFigHeight)
     for name, group in groups:
-        plt.plot(group.cholesterol_concentration, group.alpha, marker = 'o', linestyle = '', ms = 12, label = name)
+        ax.plot(group.cholesterol_concentration, group.alpha, marker = 'o', linestyle = '', ms = ms, label = name)
+        # plt.plot(group.cholesterol_concentration, group.alpha, marker = 'o', linestyle = '', ms = ms, label = name)
         # x.append(group.cholesterol_concentration)
         # y.append(group.alpha)
         # yerror.append(group.alpha_errorbar)
@@ -161,19 +185,22 @@ def plotAlpha(dfAlpha):
     print("yerror")
     print(yerror)
     # plt.plot(x,y)
-    plt.errorbar(x,y,yerr = [yerror,yerror] , fmt = ' ',ms = 1,ecolor= 'magenta')
-    plt.xlabel("cholesterol_concentration")
+    plt.errorbar(x,y,yerr = [yerror,yerror] , fmt = ' ',ms = ms,ecolor= ecolor, elinewidth=elinewidth, capsize= capsize)
+    plt.xlabel("cholesterol concentration [%]")
     plt.xticks([0,25,50])
-    plt.ylabel("alpha")        
+    plt.ylabel(r"$\alpha$", rotation = 0, labelpad = labelpad)        
 
-def plotDiffusionCoeff(dfDiffusionCoeff):
+def plotDiffusionCoeff(dfDiffusionCoeff, ms = 8, ecolor = defaultColor, elinewidth = defaultElinewidth, capsize = defaultCapsize , dpi = defaultDPI, figWidh = defaultFigWidth, figHeight = defaultFigHeight, labelpad = defaultPad):
     groups = dfDiffusionCoeff.groupby('molecule')
     x = []
     y = []
     yerror = []
-
+    fig, ax = plt.subplots()
+    ax.ticklabel_format(axis = 'y',style = 'scientific')    
+    fig.set_size_inches(defaultFigWidth, defaultFigHeight)
     for name, group in groups:
-        plt.plot(group.cholesterol_concentration, group.diffusion_coeff, marker = 'o', linestyle = '', ms = 12, label = name)
+        ax.plot(group.cholesterol_concentration, group.diffusion_coeff, marker = 'o', linestyle = '', ms = ms, label = name)
+        # plt.plot(group.cholesterol_concentration, group.diffusion_coeff, marker = 'o', linestyle = '', ms = ms, label = name)
         # x.append(group.cholesterol_concentration)
         # y.append(group.alpha)
         # yerror.append(group.alpha_errorbar)
@@ -187,8 +214,8 @@ def plotDiffusionCoeff(dfDiffusionCoeff):
     yerrorLow = [None] * len(x)
     yerrorHigh = [None] * len(x)
     for i in range(len(x)):
-        yerrorLow[i] = yerror[i][0]
-        yerrorHigh[i] = yerror[i][1]
+        yerrorLow[i] = float(yerror[i][0])
+        yerrorHigh[i] = float(yerror[i][1])
     print("yerrorLow")
     print(yerrorLow)
     print("yerrorHigh")
@@ -201,7 +228,11 @@ def plotDiffusionCoeff(dfDiffusionCoeff):
     print("yerror")
     print(yerror)
     # plt.plot(x,y)
-    plt.errorbar(x,y,yerr = [yerrorLow,yerrorHigh] , fmt = ' ',ms = 1,ecolor= 'magenta')
-    plt.xlabel("cholesterol_concentration")
+    plt.errorbar(x,y,yerr = [yerrorLow,yerrorHigh] , fmt = ' ',ms = ms,ecolor= ecolor, elinewidth=elinewidth, capsize= capsize)
+    plt.xlabel("cholesterol concentration [%]")
     plt.xticks([0,25,50])
-    plt.ylabel("diffusion_coeff")   
+    if(dfDiffusionCoeff["unit"][0] == "si"):
+        plt.ylabel(r"$D_{\infty}[\frac{m^2}{s}]$", rotation = 0, labelpad = labelpad)   
+    else:
+        plt.ylabel(r"$D_{\infty}[\frac{{nm}^2}{{ps}}]$", labelpad = labelpad)   
+        
